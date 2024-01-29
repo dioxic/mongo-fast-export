@@ -27,6 +27,7 @@ fun isNonStable(version: String): Boolean {
 }
 
 dependencies {
+    implementation("com.squareup.okio:okio:3.7.0")
     implementation("io.arrow-kt:arrow-core:1.2.1")
     implementation("io.arrow-kt:arrow-fx-coroutines:1.2.1")
     implementation("com.github.ajalt.clikt:clikt:4.2.2")
@@ -37,6 +38,7 @@ dependencies {
     implementation("org.apache.logging.log4j:log4j-api:2.22.1")
     implementation("org.apache.logging.log4j:log4j-slf4j2-impl:2.22.1")
     testImplementation("org.jetbrains.kotlin:kotlin-test")
+    testImplementation("com.squareup.okio:okio-fakefilesystem:3.7.0")
 }
 
 application {

@@ -35,14 +35,6 @@ class CliTests {
         assertEquals(0, result.statusCode)
     }
 
-    private fun dateQuery(date: String): String =
-        Document().apply {
-            put("date", Document("\$gte", Document("\$date", date)))
-        }.toJson(JsonWriterSettings.builder().outputMode(JsonMode.EXTENDED).build())
-            .also {
-                println("Date query: $it")
-            }
-
     @Test
     fun testQuery() {
         val command = Cli()
