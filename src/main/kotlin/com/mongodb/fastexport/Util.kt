@@ -5,6 +5,9 @@ import com.mongodb.MongoClientSettings
 import com.mongodb.MongoNamespace
 import com.mongodb.client.MongoClient
 import com.mongodb.client.MongoClients
+import com.mongodb.client.model.Filters
+import com.mongodb.client.model.Projections
+import org.bson.Document
 import java.util.concurrent.TimeUnit
 
 fun MongoClient.listNamespaces(): List<MongoNamespace> =
@@ -24,3 +27,9 @@ fun ConnectionString.createClient(serverSelectionTimeout: Long = 3): MongoClient
                 else -> error("Unknown protocol")
             }
         }
+
+fun String?.toQueryBson() =
+    this?.let { Document.parse(it) } ?: Filters.empty()
+
+fun List<String>?.toProjection() =
+    this?.let { Projections.include(it) }

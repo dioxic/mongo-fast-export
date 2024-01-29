@@ -28,17 +28,9 @@ class Cli : CliktCommand() {
             }
         }
 
-    private val nsFilters: List<NsFilter>? by mutuallyExclusiveOptions(
-        option("--nsInclude", help = "namespaces to include").convert { Include(MongoNamespace(it)) }.multiple(),
-        option("--nsExclude", help = "namespaces to exclude").convert { Exclude(MongoNamespace(it)) }.multiple()
-    ).single()
-//        .default(
-//        listOf(
-//            Exclude(MongoNamespace("admin.*")),
-//            Exclude(MongoNamespace("local.*")),
-//            Exclude(MongoNamespace("config.*"))
-//        )
-//    )
+    private val database by option("-d", "--database", help = "database name").required()
+
+    private val collection by option("-c", "--collection", help = "collection name").required()
 
     private val fields by option("-f", "--fields", help = "files to include (comma-delimited)")
         .split(",")
@@ -46,42 +38,32 @@ class Cli : CliktCommand() {
     private val query by option("-q", "--query", help = "query to apply (in MQL)")
 
     override fun run() {
-        echo("Namespace filters: $nsFilters")
-
         val jws = JsonWriterSettings.builder().indent(true).build()
 
         echo("connecting to $uri...")
 
-        val mcs = MongoClientSettings.builder().applyToClusterSettings {
-            it.serverSelectionTimeout(3L, TimeUnit.SECONDS)
-        }.applyConnectionString(uri).build()
-
         val client = uri.createClient()
 
-//        val namespaces = (database?.let { listOf(it) }
-//            ?: client.listDatabaseNames()).flatMap { dbName ->
-//            val db = client.getDatabase(dbName)
-//            db.listCollectionNames().map { MongoNamespace("$dbName.$it") }
-//        }.filter { nsFilters.match(it) }
-
-        val namespaces = nsFilters?.listNamespaces(client) ?: client.listNamespaces()
-
-        namespaces.forEach { ns ->
-            echo("processing namespace $ns")
-            val queryBson = query?.let { Document.parse(it) } ?: Filters.empty()
-            client.getDatabase(ns.databaseName).getCollection(ns.collectionName)
-                .find(queryBson)
-                .projection(fields?.let { Projections.include(it) })
-                .count()
-                .also {
-                    echo("count: $it")
+        client
+            .getDatabase(database)
+            .getCollection(collection)
+            .estimatedDocumentCount()
+            .also {
+                if (it == 0L) {
+                    echo("$database.$collection is empty or does not exist!")
+                    return
                 }
-//                .forEach {
-//                    echo(it.toJson(jws))
-//                }
-        }
+            }
 
-        echo("filtered: $namespaces")
+        client
+            .getDatabase(database)
+            .getCollection(collection)
+            .find(query.toQueryBson())
+            .projection(fields.toProjection())
+            .limit(1) // TODO remove this
+            .forEach {
+                echo(it.toJson(jws))
+            }
 
     }
 
