@@ -28,8 +28,6 @@ class Cli : CliktCommand() {
             }
         }
 
-    private val database by option("-d", "--database", help = "database name")
-
     private val nsFilters: List<NsFilter>? by mutuallyExclusiveOptions(
         option("--nsInclude", help = "namespaces to include").convert { Include(MongoNamespace(it)) }.multiple(),
         option("--nsExclude", help = "namespaces to exclude").convert { Exclude(MongoNamespace(it)) }.multiple()
@@ -48,7 +46,7 @@ class Cli : CliktCommand() {
     private val query by option("-q", "--query", help = "query to apply (in MQL)")
 
     override fun run() {
-        println("Namespace filters: $nsFilters")
+        echo("Namespace filters: $nsFilters")
 
         val jws = JsonWriterSettings.builder().indent(true).build()
 
@@ -83,15 +81,7 @@ class Cli : CliktCommand() {
 //                }
         }
 
-        val input = listOf(
-            "test.people",
-            "test.people2",
-            "test.animal",
-            "admin.users",
-            "something.badger"
-        ).map(::MongoNamespace)
-
-        println("filtered: $namespaces")
+        echo("filtered: $namespaces")
 
     }
 
