@@ -11,7 +11,7 @@ import kotlin.test.assertTrue
 class CliTests {
 
     private val uri = "mongodb://localhost:27017"
-    private val client = ConnectionString(uri).createClient()
+    private val client = createClient(uri)
 
     @BeforeTest
     fun setup() {

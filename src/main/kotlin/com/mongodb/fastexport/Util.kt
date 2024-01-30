@@ -5,8 +5,8 @@ import com.mongodb.MongoClientSettings
 import com.mongodb.client.MongoClient
 import com.mongodb.client.MongoClients
 import com.mongodb.client.model.Filters
-import com.mongodb.client.model.Projections
 import com.mongodb.client.model.Projections.*
+import org.bson.BsonDocument
 import org.bson.Document
 import org.bson.conversions.Bson
 import java.util.concurrent.TimeUnit
@@ -25,8 +25,8 @@ fun createClient(uri: String, serverSelectionTimeout: Long = 3): MongoClient =
         else -> error("Unknown protocol")
     }
 
-fun String?.toQueryBson(): Bson =
-    this?.let { Document.parse(it) } ?: Filters.empty()
+fun String?.toQueryBson(): Document =
+    this?.let { Document.parse(it) } ?: Document()
 
 fun List<String>?.toProjection(): Bson? =
     this?.let {

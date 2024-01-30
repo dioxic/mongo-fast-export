@@ -35,7 +35,7 @@ class EngineTests {
                 client = client,
                 database = "test",
                 collection = "taxlots",
-                fields = listOf("firstName", "taxlots.rec"),
+                projection = listOf("firstName", "taxlots.rec"),
                 filter = dateQuery("2024-01-01T12:00:00.000Z").toQueryBson(),
                 sink = fs.sink(fakeFile).buffer()
             )

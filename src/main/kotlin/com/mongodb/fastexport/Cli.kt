@@ -10,23 +10,30 @@ import com.github.ajalt.clikt.parameters.groups.groupChoice
 import com.github.ajalt.clikt.parameters.options.*
 import com.github.ajalt.clikt.parameters.types.path
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.conflate
+import kotlinx.coroutines.flow.onEach
+import kotlinx.coroutines.flow.runningFold
 import kotlinx.coroutines.runBlocking
 import okio.FileSystem
 import okio.Path.Companion.toOkioPath
 import okio.Path.Companion.toPath
 import okio.buffer
 import okio.sink
+import org.bson.Document
 import java.time.format.DateTimeFormatter
+import kotlin.time.Duration.Companion.seconds
 import kotlin.time.measureTime
-import kotlin.time.measureTimedValue
 
 sealed class Mode(val fileExtension: String, name: String, help: String) : OptionGroup(name, help)
 class JsonOptionGroup : Mode("json", "Json Mode", "JSON export mode")
 class CsvOptionGroup : Mode("csv", "CSV Mode", "CSV export mode") {
-    val arrayField by option("-a", "--array", help = "array field")
+    val arrayField by option("-a", "--array", help = "array field to denormalize")
     val dateFormatter: DateTimeFormatter by option("--date-format", help = "date format pattern").convert {
         DateTimeFormatter.ofPattern(it)
-    }.default(DateTimeFormatter.ISO_DATE_TIME)
+    }.default(DateTimeFormatter.ISO_DATE_TIME, defaultForHelp = "ISO Format")
+    val includeHeader by option("--header", help = "include csv header in export").flag()
+    val delimiter by option("--delimiter", help = "delimiter character").default(",")
 }
 
 class Cli : CliktCommand() {
@@ -51,10 +58,16 @@ class Cli : CliktCommand() {
 
     private val collection by option("-c", "--collection", help = "collection name").required()
 
-    private val query by option("-q", "--query", help = "filter query (in MQL)")
+    private val query by option("-q", "--query", help = "filter query (in MQL)").convert {
+        Document.parse(it)
+    }.default(Document())
 
     private val fields by option("-f", "--fields", help = "fields to include (comma-delimited)")
         .split(",")
+
+    private val projection by option("--projection", help = "projection (in MQL)").convert {
+        Document.parse(it)
+    }
 
     private val mode by option("--mode", help = "export mode").groupChoice(
         "json" to JsonOptionGroup(),
@@ -68,15 +81,23 @@ class Cli : CliktCommand() {
     private val test by option("--test", help = "print 5 record to the console for testing").flag()
 
     override fun run() {
-        if (mode is CsvOptionGroup && fields == null) {
-            throw UsageError("missing option --fields must be specified in CSV export mode", "fields")
+        if (mode is CsvOptionGroup && fields == null && projection == null) {
+            throw UsageError("--fields or --projection must be specified in CSV export mode.", "fields")
         }
+
+        if (projection != null && fields != null) {
+            throw UsageError("--projection and --fields cannot both be specified.")
+        }
+
+        query?.also { echo("filter query: ${it.toJson()}") }
+        fields?.also { echo("projection: ${it.toProjection()?.toBsonDocument()?.toJson()}") }
+        projection?.also { echo("projection: ${it.toBsonDocument().toJson()}") }
 
         echo("connecting to $uri...")
 
         val client = createClient(uri)
 
-        val collectionSize = client
+        client
             .getDatabase(database)
             .getCollection(collection)
             .estimatedDocumentCount()
@@ -87,14 +108,14 @@ class Cli : CliktCommand() {
                 }
             }
 
-        query?.also { echo("filter query: $it") }
-        fields?.also { echo( "projection: ${it.toProjection()?.toBsonDocument()?.toJson()}") }
 
         val sink = when {
             test -> {
                 echo("exporting '$database.$collection' to console")
+                echo("----------------------------------------------")
                 System.out.sink().buffer()
             }
+
             else -> {
                 val p = path ?: "$collection.${mode.fileExtension}".toPath()
                 echo("exporting '$database.$collection' to ${p.name}")
@@ -109,28 +130,38 @@ class Cli : CliktCommand() {
 
         measureTime {
             runBlocking(Dispatchers.Default) {
-                when (val it = mode) {
-                    is JsonOptionGroup -> jsonExport(
-                        client = client,
-                        database = database,
-                        collection = collection,
-                        fields = fields,
-                        filter = query.toQueryBson(),
-                        limit = limit,
-                        sink = sink
-                    )
+                sink.use {
+                    when (val modeGrp = mode) {
+                        is JsonOptionGroup -> sink.jsonExport(
+                            client = client,
+                            database = database,
+                            collection = collection,
+                            projection = projection ?: fields.toProjection(),
+                            filter = query,
+                            limit = limit,
+                        )
 
-                    is CsvOptionGroup -> csvExport(
-                        client = client,
-                        database = database,
-                        collection = collection,
-                        fields = fields!!,
-                        filter = query.toQueryBson(),
-                        limit = limit,
-                        arrayField = it.arrayField,
-                        sink = sink,
-                        dateFormatter = it.dateFormatter
-                    )
+                        is CsvOptionGroup -> sink.csvExport(
+                            client = client,
+                            database = database,
+                            collection = collection,
+                            projection = projection ?: fields.toProjection()!!,
+                            filter = query,
+                            limit = limit,
+                            arrayField = modeGrp.arrayField,
+                            dateFormatter = modeGrp.dateFormatter,
+                            delimiter = modeGrp.delimiter,
+                            includeHeader = modeGrp.includeHeader
+                        )
+                    }.runningFold(0L) { accumulator, _ ->
+                        accumulator + 1L
+                    }.conflate()
+                        .onEach { delay(1.seconds) }
+                        .collect {
+                            if (!test) {
+                                echo("exported $it records")
+                            }
+                        }
                 }
             }
         }.also { duration ->
