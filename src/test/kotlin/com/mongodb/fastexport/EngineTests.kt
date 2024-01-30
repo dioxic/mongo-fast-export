@@ -1,10 +1,11 @@
 package com.mongodb.fastexport
 
-import com.mongodb.ConnectionString
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.runBlocking
 import okio.Path.Companion.toPath
 import okio.buffer
 import okio.fakefilesystem.FakeFileSystem
+import java.time.format.DateTimeFormatter
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -12,7 +13,7 @@ import kotlin.test.assertEquals
 class EngineTests {
 
     private val uri = "mongodb://localhost:27017"
-    private val client = ConnectionString(uri).createClient()
+    private val client = createClient(uri)
 
     @BeforeTest
     fun setup() {
@@ -31,17 +32,19 @@ class EngineTests {
         val fakeFile = dir / "fakefile"
         fs.createDirectories(dir)
         runBlocking {
-            jsonExport(
-                client = client,
-                database = "test",
-                collection = "taxlots",
-                projection = listOf("firstName", "taxlots.rec"),
-                filter = dateQuery("2024-01-01T12:00:00.000Z").toQueryBson(),
-                sink = fs.sink(fakeFile).buffer()
-            )
+            fs.sink(fakeFile).buffer().use { bs ->
+                bs.jsonExport(
+                    client = client,
+                    database = "test",
+                    collection = "taxlots",
+                    projection = listOf("firstName", "taxlots.rec").toProjection(),
+                    filter = dateQuery("2024-01-01T12:00:00.000Z").toQueryBson(),
+                ).collect()
+            }
         }
+
         val expected = """
-            {"_id": "myId", "firstName": "Bob", "taxlots": [{"rec": 0}, {"rec": 1}, {"rec": 2}]}
+            {"firstName": "Bob", "taxlots": [{"rec": 0}, {"rec": 1}, {"rec": 2}]}
             
         """.trimIndent()
         assertEquals(expected, fs.read(fakeFile) { readUtf8() })
@@ -54,17 +57,20 @@ class EngineTests {
         val fakeFile = dir / "fakefile"
         fs.createDirectories(dir)
         runBlocking {
-            csvExport(
-                client = client,
-                database = "test",
-                collection = "taxlots",
-                fields = listOf("taxlots.rec", "firstName"),
-                filter = dateQuery("2024-01-01T12:00:00.000Z").toQueryBson(),
-                arrayField = "taxlots",
-                sink = fs.sink(fakeFile).buffer(),
-            )
+            fs.sink(fakeFile).buffer().use { bs ->
+                bs.csvExport(
+                    client = client,
+                    database = "test",
+                    collection = "taxlots",
+                    projection = listOf("taxlots.rec", "firstName").toProjection()!!,
+                    filter = dateQuery("2024-01-01T12:00:00.000Z").toQueryBson(),
+                    arrayField = "taxlots",
+                    dateFormatter = DateTimeFormatter.ISO_DATE_TIME
+                ).collect()
+            }
         }
         val expected = """
+            taxlots.rec,firstName
             0,Bob
             1,Bob
             2,Bob

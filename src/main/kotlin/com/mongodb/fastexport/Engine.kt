@@ -46,7 +46,7 @@ fun BufferedSink.jsonExport(
     collection: String,
     projection: Bson?,
     filter: Bson,
-    limit: Int?,
+    limit: Int? = null,
 ): Flow<Unit> =
     client
         .getDatabase(database)
@@ -74,7 +74,7 @@ fun BufferedSink.csvExport(
     collection: String,
     projection: Bson,
     filter: Bson,
-    limit: Int?,
+    limit: Int? = null,
     arrayField: String?,
     dateFormatter: DateTimeFormatter,
     includeHeader: Boolean = true,

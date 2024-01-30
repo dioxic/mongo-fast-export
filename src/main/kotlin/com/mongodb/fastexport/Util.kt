@@ -4,9 +4,7 @@ import com.mongodb.ConnectionString
 import com.mongodb.MongoClientSettings
 import com.mongodb.client.MongoClient
 import com.mongodb.client.MongoClients
-import com.mongodb.client.model.Filters
 import com.mongodb.client.model.Projections.*
-import org.bson.BsonDocument
 import org.bson.Document
 import org.bson.conversions.Bson
 import java.util.concurrent.TimeUnit
