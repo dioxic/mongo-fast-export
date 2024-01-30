@@ -42,7 +42,7 @@ dependencies {
 }
 
 application {
-    mainClass.set("com.mongodb.jsondump.Cli")
+    mainClass.set("com.mongodb.fastexport.CliKt")
 }
 
 tasks.withType<JavaCompile> {

@@ -2,10 +2,11 @@ package com.mongodb.fastexport
 
 import com.github.ajalt.clikt.testing.test
 import com.mongodb.ConnectionString
-import org.bson.Document
-import org.bson.json.JsonMode
-import org.bson.json.JsonWriterSettings
-import kotlin.test.*
+import org.junit.jupiter.api.assertThrows
+import kotlin.test.BeforeTest
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 
 class CliTests {
 
@@ -20,6 +21,14 @@ class CliTests {
                 coll.drop()
                 coll.insertOne(createTaxlot())
             }
+    }
+
+    @Test
+    fun testMandatoryFieldArgsForCsv() {
+        val command = Cli()
+        val ex = assertThrows<IllegalArgumentException> {
+            command.test("--uri $uri -d test -c taxlots --csv")
+        }
     }
 
     @Test
