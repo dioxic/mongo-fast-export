@@ -108,16 +108,21 @@ fun BufferedSink.csvExport(
         .aggregate(pipeline)
         .asFlow()
         .parMapUnordered { doc ->
-            val flatDoc = doc.decode(codec).flatten(leafOnly = true)
-            columns.map { field ->
-                flatDoc[field].let {
-                    when (it) {
-                        is LocalDateTime -> dateFormatter.format(it)
-                        else -> it
-                    }
-                }
-            }.joinToString(delimiter)
+            val writer = StringWriter()
+            codec.encode(CsvWriter(writer, cws), doc, context)
+            writer.toString()
         }
+//        .parMapUnordered { doc ->
+//            val flatDoc = doc.decode(codec).flatten(leafOnly = true)
+//            columns.map { field ->
+//                flatDoc[field].let {
+//                    when (it) {
+//                        is LocalDateTime -> dateFormatter.format(it)
+//                        else -> it
+//                    }
+//                }
+//            }.joinToString(delimiter)
+//        }
         .map {
             writeUtf8(it)
             writeUtf8("\n")
