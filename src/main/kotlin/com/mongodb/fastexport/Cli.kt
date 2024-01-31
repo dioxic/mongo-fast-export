@@ -8,6 +8,8 @@ import com.github.ajalt.clikt.parameters.groups.OptionGroup
 import com.github.ajalt.clikt.parameters.groups.defaultByName
 import com.github.ajalt.clikt.parameters.groups.groupChoice
 import com.github.ajalt.clikt.parameters.options.*
+import com.github.ajalt.clikt.parameters.types.enum
+import com.github.ajalt.clikt.parameters.types.int
 import com.github.ajalt.clikt.parameters.types.path
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -21,12 +23,16 @@ import okio.Path.Companion.toPath
 import okio.buffer
 import okio.sink
 import org.bson.Document
+import org.bson.json.JsonMode
 import java.time.format.DateTimeFormatter
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.measureTime
 
 sealed class Mode(val fileExtension: String, name: String, help: String) : OptionGroup(name, help)
-class JsonOptionGroup : Mode("json", "Json Mode", "JSON export mode")
+class JsonOptionGroup : Mode("json", "Json Mode", "JSON export mode") {
+    val jsonFormat by option("--jsonFormat", help = "json format to export").enum<JsonMode>()
+        .default(JsonMode.RELAXED)
+}
 class CsvOptionGroup : Mode("csv", "CSV Mode", "CSV export mode") {
     val arrayField by option("-a", "--array", help = "array field to denormalize")
     val dateFormatter: DateTimeFormatter by option("--date-format", help = "date format pattern").convert {
@@ -78,7 +84,11 @@ class Cli : CliktCommand() {
         it.toOkioPath()
     }
 
-    private val test by option("--test", help = "print 5 record to the console for testing").flag()
+    private val outputTick by option("--outputTickSeconds", hidden = true).int().default(1)
+
+    private val testFlag by option("--test", help = "print 5 record to the console for testing").flag()
+
+    private val limitArg by option("--limit", help="limit the number of documents to export").int()
 
     override fun run() {
         if (mode is CsvOptionGroup && fields == null && projection == null) {
@@ -110,7 +120,7 @@ class Cli : CliktCommand() {
 
 
         val sink = when {
-            test -> {
+            testFlag -> {
                 echo("exporting '$database.$collection' to console")
                 echo("----------------------------------------------")
                 System.out.sink().buffer()
@@ -124,8 +134,8 @@ class Cli : CliktCommand() {
         }
 
         val limit = when {
-            test -> 5
-            else -> null
+            testFlag -> limitArg ?: 1
+            else -> limitArg
         }
 
         measureTime {
@@ -139,6 +149,7 @@ class Cli : CliktCommand() {
                             projection = projection ?: fields.toProjection(),
                             filter = query,
                             limit = limit,
+                            jsonFormat = modeGrp.jsonFormat,
                         )
 
                         is CsvOptionGroup -> sink.csvExport(
@@ -156,9 +167,9 @@ class Cli : CliktCommand() {
                     }.runningFold(0L) { accumulator, _ ->
                         accumulator + 1L
                     }.conflate()
-                        .onEach { delay(1.seconds) }
+                        .onEach { delay(outputTick.seconds) }
                         .collect {
-                            if (!test) {
+                            if (!testFlag) {
                                 echo("exported $it records")
                             }
                         }

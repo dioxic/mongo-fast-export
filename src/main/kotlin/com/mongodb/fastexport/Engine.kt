@@ -13,7 +13,6 @@ import kotlinx.coroutines.flow.map
 import okio.BufferedSink
 import org.bson.BsonInt32
 import org.bson.BsonType
-import org.bson.Document
 import org.bson.RawBsonDocument
 import org.bson.codecs.BsonTypeClassMap
 import org.bson.codecs.DocumentCodecProvider
@@ -30,9 +29,6 @@ import java.io.StringWriter
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 
-private val jws: JsonWriterSettings = JsonWriterSettings.builder().outputMode(JsonMode.RELAXED).build()
-private val codec = RawBsonDocumentCodec()
-private val context: EncoderContext = EncoderContext.builder().build()
 private val engineCodecRegistry = fromRegistries(
     fromProviders(DocumentCodecProvider(BsonTypeClassMap(mapOf(BsonType.DATE_TIME to LocalDateTime::class.java)))),
     fromProviders(Jsr310CodecProvider()),
@@ -47,8 +43,13 @@ fun BufferedSink.jsonExport(
     projection: Bson?,
     filter: Bson,
     limit: Int? = null,
-): Flow<Unit> =
-    client
+    jsonFormat: JsonMode
+): Flow<Unit> {
+    val jws: JsonWriterSettings = JsonWriterSettings.builder().outputMode(jsonFormat).build()
+    val codec = RawBsonDocumentCodec()
+    val context: EncoderContext = EncoderContext.builder().build()
+
+    return client
         .getDatabase(database)
         .getCollection(collection, RawBsonDocument::class.java)
         .find(filter)
@@ -66,6 +67,7 @@ fun BufferedSink.jsonExport(
             writeUtf8("\n")
             Unit
         }
+}
 
 @OptIn(FlowPreview::class, ExperimentalCoroutinesApi::class)
 fun BufferedSink.csvExport(
@@ -94,14 +96,19 @@ fun BufferedSink.csvExport(
         writeUtf8("\n")
     }
 
+//    val codec = engineCodecRegistry.get(Document::class.java)
+    val cws = CsvWriterSettings(delimiter, dateFormatter, columns, arrayField)
+    val codec = RawBsonDocumentCodec()
+    val context: EncoderContext = EncoderContext.builder().build()
+
     return client
         .getDatabase(database)
-        .getCollection(collection, Document::class.java)
-        .withCodecRegistry(engineCodecRegistry)
+        .getCollection(collection, RawBsonDocument::class.java)
+//        .withCodecRegistry(engineCodecRegistry)
         .aggregate(pipeline)
         .asFlow()
         .parMapUnordered { doc ->
-            val flatDoc = doc.flatten(leafOnly = true)
+            val flatDoc = doc.decode(codec).flatten(leafOnly = true)
             columns.map { field ->
                 flatDoc[field].let {
                     when (it) {
@@ -110,7 +117,8 @@ fun BufferedSink.csvExport(
                     }
                 }
             }.joinToString(delimiter)
-        }.map {
+        }
+        .map {
             writeUtf8(it)
             writeUtf8("\n")
             Unit
