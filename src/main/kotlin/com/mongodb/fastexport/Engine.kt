@@ -4,6 +4,7 @@ import arrow.fx.coroutines.parMapUnordered
 import com.mongodb.client.MongoClient
 import com.mongodb.client.model.Aggregates
 import com.mongodb.client.model.Aggregates.limit
+import com.mongodb.client.model.UnwindOptions
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.Flow
@@ -71,7 +72,7 @@ fun BufferedSink.csvExport(
     val pipeline = buildList<Bson> {
         add(Aggregates.match(filter))
         limit?.also { add(limit(limit)) }
-        arrayField?.also { add(Aggregates.unwind("\$$it")) }
+        arrayField?.also { add(Aggregates.unwind("\$$it", UnwindOptions().preserveNullAndEmptyArrays(true))) }
         add(Aggregates.project(projection))
     }
 

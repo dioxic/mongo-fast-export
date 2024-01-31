@@ -14,7 +14,7 @@ class CsvWriter(
     private val csvSettings: CsvWriterSettings
 ) : AbstractBsonWriter(csvSettings) {
 
-    private val map = HashMap<String, String>(csvSettings.columns.size)
+    private val map = csvSettings.columns.associateWith { "" }.toMutableMap()
     private val fieldStack = Stack<String>()
 
     init {
