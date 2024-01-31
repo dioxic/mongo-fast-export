@@ -7,5 +7,4 @@ class CsvWriterSettings(
     val delimiter: String,
     val dateFormatter: DateTimeFormatter,
     val columns: Collection<String>,
-    val unwindField: String?,
 ) : BsonWriterSettings()

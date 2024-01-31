@@ -1,7 +1,6 @@
 package com.mongodb.fastexport
 
 import arrow.fx.coroutines.parMapUnordered
-import com.mongodb.MongoClientSettings
 import com.mongodb.client.MongoClient
 import com.mongodb.client.model.Aggregates
 import com.mongodb.client.model.Aggregates.limit
@@ -12,28 +11,15 @@ import kotlinx.coroutines.flow.asFlow
 import kotlinx.coroutines.flow.map
 import okio.BufferedSink
 import org.bson.BsonInt32
-import org.bson.BsonType
 import org.bson.RawBsonDocument
-import org.bson.codecs.BsonTypeClassMap
-import org.bson.codecs.DocumentCodecProvider
 import org.bson.codecs.EncoderContext
 import org.bson.codecs.RawBsonDocumentCodec
-import org.bson.codecs.configuration.CodecRegistries.fromProviders
-import org.bson.codecs.configuration.CodecRegistries.fromRegistries
-import org.bson.codecs.jsr310.Jsr310CodecProvider
 import org.bson.conversions.Bson
 import org.bson.json.JsonMode
 import org.bson.json.JsonWriter
 import org.bson.json.JsonWriterSettings
 import java.io.StringWriter
-import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
-
-private val engineCodecRegistry = fromRegistries(
-    fromProviders(DocumentCodecProvider(BsonTypeClassMap(mapOf(BsonType.DATE_TIME to LocalDateTime::class.java)))),
-    fromProviders(Jsr310CodecProvider()),
-    MongoClientSettings.getDefaultCodecRegistry()
-)
 
 @OptIn(FlowPreview::class, ExperimentalCoroutinesApi::class)
 fun BufferedSink.jsonExport(
@@ -96,15 +82,13 @@ fun BufferedSink.csvExport(
         writeUtf8("\n")
     }
 
-//    val codec = engineCodecRegistry.get(Document::class.java)
-    val cws = CsvWriterSettings(delimiter, dateFormatter, columns, arrayField)
+    val cws = CsvWriterSettings(delimiter, dateFormatter, columns)
     val codec = RawBsonDocumentCodec()
     val context: EncoderContext = EncoderContext.builder().build()
 
     return client
         .getDatabase(database)
         .getCollection(collection, RawBsonDocument::class.java)
-//        .withCodecRegistry(engineCodecRegistry)
         .aggregate(pipeline)
         .asFlow()
         .parMapUnordered { doc ->
@@ -112,17 +96,6 @@ fun BufferedSink.csvExport(
             codec.encode(CsvWriter(writer, cws), doc, context)
             writer.toString()
         }
-//        .parMapUnordered { doc ->
-//            val flatDoc = doc.decode(codec).flatten(leafOnly = true)
-//            columns.map { field ->
-//                flatDoc[field].let {
-//                    when (it) {
-//                        is LocalDateTime -> dateFormatter.format(it)
-//                        else -> it
-//                    }
-//                }
-//            }.joinToString(delimiter)
-//        }
         .map {
             writeUtf8(it)
             writeUtf8("\n")

@@ -30,7 +30,7 @@ import kotlin.time.measureTime
 
 sealed class Mode(val fileExtension: String, name: String, help: String) : OptionGroup(name, help)
 class JsonOptionGroup : Mode("json", "Json Mode", "JSON export mode") {
-    val jsonFormat by option("--jsonFormat", help = "json format to export").enum<JsonMode>()
+    val jsonFormat by option("--json-format", help = "json format to export").enum<JsonMode>()
         .default(JsonMode.RELAXED)
 }
 class CsvOptionGroup : Mode("csv", "CSV Mode", "CSV export mode") {
@@ -66,7 +66,7 @@ class Cli : CliktCommand() {
 
     private val query by option("-q", "--query", help = "filter query (in MQL)").convert {
         Document.parse(it)
-    }.default(Document())
+    }.default(Document(), defaultForHelp = "{}")
 
     private val fields by option("-f", "--fields", help = "fields to include (comma-delimited)")
         .split(",")
@@ -86,7 +86,7 @@ class Cli : CliktCommand() {
 
     private val outputTick by option("--outputTickSeconds", hidden = true).int().default(1)
 
-    private val testFlag by option("--test", help = "print 5 record to the console for testing").flag()
+    private val testFlag by option("--test", help = "print a single document to the console for testing").flag()
 
     private val limitArg by option("--limit", help="limit the number of documents to export").int()
 
@@ -117,7 +117,6 @@ class Cli : CliktCommand() {
                     return
                 }
             }
-
 
         val sink = when {
             testFlag -> {
@@ -176,7 +175,7 @@ class Cli : CliktCommand() {
                 }
             }
         }.also { duration ->
-            echo("Completed export of $database.$collection in $duration")
+            echo("Completed export of '$database.$collection' in $duration")
         }
     }
 }

@@ -16,7 +16,6 @@ class CsvWriter(
 
     private val map = HashMap<String, String>(csvSettings.columns.size)
     private val fieldStack = Stack<String>()
-    private val runningCoordinates: String = ""
 
     init {
         context = Context(null, BsonContextType.TOP_LEVEL)
@@ -62,11 +61,13 @@ class CsvWriter(
     }
 
     override fun doWriteStartArray() {
-        context = Context(context as Context, BsonContextType.ARRAY)
+        error("bson array not supported for decode - use the --array option")
+//        context = Context(context as Context, BsonContextType.ARRAY)
     }
 
     override fun doWriteEndArray() {
-        context = context.parentContext
+        error("bson array not supported for decode - use the --array option")
+//        context = context.parentContext
     }
 
     override fun doWriteBinaryData(value: BsonBinary) {
