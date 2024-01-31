@@ -17,6 +17,7 @@ import kotlinx.coroutines.flow.conflate
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.runningFold
 import kotlinx.coroutines.runBlocking
+import okio.Buffer
 import okio.FileSystem
 import okio.Path.Companion.toOkioPath
 import okio.Path.Companion.toPath
@@ -118,11 +119,11 @@ class Cli : CliktCommand() {
                 }
             }
 
-        val sink = when {
+        val bufferedSink = when {
             testFlag -> {
                 echo("exporting '$database.$collection' to console")
                 echo("----------------------------------------------")
-                System.out.sink().buffer()
+                Buffer()
             }
 
             else -> {
@@ -139,7 +140,7 @@ class Cli : CliktCommand() {
 
         measureTime {
             runBlocking(Dispatchers.Default) {
-                sink.use {
+                bufferedSink.use { sink ->
                     when (val modeGrp = mode) {
                         is JsonOptionGroup -> sink.jsonExport(
                             client = client,
@@ -175,7 +176,12 @@ class Cli : CliktCommand() {
                 }
             }
         }.also { duration ->
-            echo("Completed export of '$database.$collection' in $duration")
+            if (testFlag) {
+                echo((bufferedSink as Buffer).readByteString().utf8())
+            }
+            else {
+                echo("Completed export of '$database.$collection' in $duration")
+            }
         }
     }
 }
